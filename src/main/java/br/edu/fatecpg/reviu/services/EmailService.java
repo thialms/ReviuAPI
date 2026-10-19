@@ -1,6 +1,7 @@
 package br.edu.fatecpg.reviu.services;
 
 import br.edu.fatecpg.reviu.domain.user.User;
+import br.edu.fatecpg.reviu.repositories.VerificationCodesRepository;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -14,9 +15,11 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
     private final String fromAddress = "thiiago.allmeida44@gmail.com";
+    private final VerificationCodesRepository verificationCodesRepository;
 
-    public EmailService(JavaMailSender mailSender) {
+    public EmailService(JavaMailSender mailSender, VerificationCodesRepository verificationCodesRepository) {
         this.mailSender = mailSender;
+        this.verificationCodesRepository = verificationCodesRepository;
     }
 
     @Async
@@ -29,7 +32,7 @@ public class EmailService {
             helper.setTo(user.getEmail());
             helper.setSubject("Verifique seu e-mail - Reviu");
 
-            String htmlContent = buildHtml(user.getName(), user.getVerificationCode());
+            String htmlContent = buildHtml(user.getName(), verificationCodesRepository.findByUser(user).get().getCode());
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
@@ -49,7 +52,7 @@ public class EmailService {
             helper.setTo(user.getEmail());
             helper.setSubject("Verifique seu e-mail - Reviu");
 
-            String htmlContent = buildHtml(user.getName(), user.getForgotPasswordCode());
+            String htmlContent = buildHtml(user.getName(), verificationCodesRepository.findByUser(user).get().getCode());
             helper.setText(htmlContent, true);
 
             mailSender.send(message);

@@ -30,12 +30,7 @@ public class User {
     private String password;
 
     // Vericação do email
-    private String verificationCode; // código enviado por e-mail
     private Boolean verified = false; // true se o usuário confirmou o e-mail
-    private Instant verificationExpiry; // expiração do código
-
-    private String forgotPasswordCode; // código enviado por e-mail para recuperar senha
-    private Instant forgotPasswordExpiry; // expiração do código enviado por e-mail para recuperar senha
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Deck> decks = new ArrayList<>();
