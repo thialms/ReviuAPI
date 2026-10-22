@@ -73,7 +73,12 @@ public class AuthController {
             String code = authService.generateCode();
 
             verificationCodesRepository
-                    .save(new VerificationCodes(null, code, Instant.now().plus(1, ChronoUnit.HOURS), newUser));
+                    .save(new VerificationCodes(
+                            null,
+                            code,
+                            Instant.now().plus(1, ChronoUnit.HOURS),
+                            newUser
+                    ));
 
             emailService.sendVerificationEmail(newUser);
             return ResponseEntity.ok("Verifique seu e-mail");
@@ -89,14 +94,20 @@ public class AuthController {
     })
     public ResponseEntity<?> verifyEmail(@RequestBody VerifyCodeDTO body) {
         Optional<VerificationCodes> optionalVerificationCode = verificationCodesRepository.findByCode(body.code());
-        Optional<User> optionalUser = userRepository.findById(optionalVerificationCode.get().getUser().getId());
+
+        VerificationCodes verificationCode = optionalVerificationCode.orElse(null);
+
+        if (verificationCode == null) {
+            return ResponseEntity.badRequest().body("Código inválido.");
+        }
+
+        Optional<User> optionalUser = userRepository.findById(verificationCode.getUser().getId());
 
         if (optionalUser.isEmpty()) {
             return ResponseEntity.badRequest().body("Código inválido.");
         }
 
         User user = optionalUser.get();
-        VerificationCodes verificationCode = optionalVerificationCode.get();
 
         if (user.getVerified()) {
             return ResponseEntity.ok("Usuário já verificado.");
@@ -108,10 +119,8 @@ public class AuthController {
         }
 
         user.setVerified(true);
-        verificationCode.setCode(null);
-        verificationCode.setExpiry(null);
         userRepository.save(user);
-        verificationCodesRepository.save(verificationCode);
+        verificationCodesRepository.delete(verificationCode);
         
         String token = this.tokenService.generateToken(user);
         return ResponseEntity.ok(new LoginAndRegisterResponseDTO(user.getName(), token));
@@ -132,17 +141,32 @@ public class AuthController {
 
         User user = optionalUser.get();
 
-        Optional<VerificationCodes> optionalVerificationCode = verificationCodesRepository.findByUser(user);
-
-        VerificationCodes verificationCode = optionalVerificationCode.get();
-
         if (user.getVerified()) {
             return ResponseEntity.badRequest().body("Usuário já verificado.");
         }
 
         String newCode = authService.generateCode();
-        verificationCode.setCode(newCode);
-        verificationCode.setExpiry(Instant.now().plus(1, ChronoUnit.HOURS));
+
+        Optional<VerificationCodes> optionalVerificationCode = verificationCodesRepository.findByUser(user);
+
+        VerificationCodes verificationCode;
+
+        if (optionalVerificationCode.isEmpty()) {
+            verificationCode = verificationCodesRepository
+                    .save(new VerificationCodes(
+                            null,
+                            newCode,
+                            Instant.now().plus(1, ChronoUnit.HOURS),
+                            user
+                    ));
+        }
+        else {
+            verificationCode = optionalVerificationCode.get();
+
+            verificationCode.setCode(newCode);
+            verificationCode.setExpiry(Instant.now().plus(1, ChronoUnit.HOURS));
+        }
+
         verificationCodesRepository.save(verificationCode);
 
         emailService.sendVerificationEmail(user);
@@ -159,13 +183,16 @@ public class AuthController {
     public ResponseEntity<?> forgotPassword(@RequestBody EmailRequestDTO request) {
         User user = this.userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        Optional<VerificationCodes> optionalVerificationCode = verificationCodesRepository.findByUser(user);
-        VerificationCodes verificationCode = optionalVerificationCode.get();
 
         String code = authService.generateCode();
-        verificationCode.setCode(code);
-        verificationCode.setExpiry(Instant.now().plus(1, ChronoUnit.HOURS));
-        verificationCodesRepository.save(verificationCode);
+
+        verificationCodesRepository
+                .save(new VerificationCodes(
+                        null,
+                        code,
+                        Instant.now().plus(1, ChronoUnit.HOURS),
+                        user
+                ));
 
         emailService.sendForgotPasswordEmail(user);
         return ResponseEntity.ok("Código de redefinição de senha enviado para o seu e-mail.");
@@ -179,14 +206,18 @@ public class AuthController {
     })
     public ResponseEntity<?> resetForgotPassword(@Valid @RequestBody ResetForgotPasswordDTO request) {
         Optional<VerificationCodes> optionalVerificationCode = verificationCodesRepository.findByCode(request.code());
-        Optional<User> optionalUser = userRepository.findById(optionalVerificationCode.get().getUser().getId());
+        VerificationCodes verificationCode = optionalVerificationCode.orElse(null);
+        if (verificationCode == null) {
+            return ResponseEntity.badRequest().body("Código inválido.");
+        }
+
+        Optional<User> optionalUser = userRepository.findById(verificationCode.getUser().getId());
 
         if (optionalUser.isEmpty()) {
             return ResponseEntity.badRequest().body("Usuário não encontrado.");
         }
 
         User user = optionalUser.get();
-        VerificationCodes verificationCode = optionalVerificationCode.get();
 
         if (verificationCode.getExpiry() != null &&
                 Instant.now().isAfter(verificationCode.getExpiry())) {
@@ -195,10 +226,8 @@ public class AuthController {
 
         // Redefine a senha do usuário
         user.setPassword(passwordEncoder.encode(request.newPassword()));
-        verificationCode.setExpiry(null);
-        verificationCode.setCode(null);
-        verificationCodesRepository.save(verificationCode);
         userRepository.save(user);
+        verificationCodesRepository.delete(verificationCode);
 
         return ResponseEntity.ok("Senha alterada com sucesso!");
     }
