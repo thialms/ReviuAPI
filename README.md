@@ -22,7 +22,7 @@ Este repositório contém todo o backend da aplicação, desenvolvido em **Java 
 - Sistema de **repetição espaçada (Machine Learning & SRS – Algoritmo SM-2)**
 - Cards são compartilháveis entre decks e o progresso de revisão é individual por usuário
 - Revisões com notas de 1 a 4 (sendo a nota 1: "errou" e sendo a nota 4: "fácil")
-- Cold start para o modelo de aprendizado de máquina possuir dados para realizar as previsões exclusivas de repetições de cards para cada usuário
+- Onboarding para o modelo de aprendizado de máquina possuir dados para realizar as previsões exclusivas de repetições de cards para cada usuário
 
 ### 🤖 Recursos com IA
 - Geração automática de flashcards enviando um **PDF**
