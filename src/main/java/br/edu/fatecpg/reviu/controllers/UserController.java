@@ -3,6 +3,7 @@ package br.edu.fatecpg.reviu.controllers;
 import br.edu.fatecpg.reviu.domain.user.Friendship;
 import br.edu.fatecpg.reviu.domain.user.User;
 import br.edu.fatecpg.reviu.domain.user.UserBlock;
+import br.edu.fatecpg.reviu.repositories.DeckShareRequestRepository;
 import br.edu.fatecpg.reviu.domain.user.UserOnboarding;
 import br.edu.fatecpg.reviu.dto.requests.ChangePasswordDTO;
 import br.edu.fatecpg.reviu.dto.requests.OnboardingRequestDTO;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -51,6 +53,9 @@ public class UserController {
 
     @Autowired
     private UserBlockRepository userBlockRepository;
+
+    @Autowired
+    private DeckShareRequestRepository deckShareRequestRepository;
 
     @PutMapping("/change-password")
     @Operation(
@@ -142,7 +147,7 @@ public class UserController {
         return ResponseEntity.ok(blockedUsers);
     }
 
-    @PostMapping({"/blocked/{userId}"})
+    @PostMapping("/blocked/{userId}")
     @Operation(
             summary = "Bloqueia um usuário",
             description = "Bloqueia outro usuário e remove qualquer relação de amizade ou pedido pendente entre vocês."
@@ -152,6 +157,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Usuário inválido ou já bloqueado"),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
     })
+    @Transactional
     public ResponseEntity<?> blockUser(@PathVariable Long userId) {
         User authenticatedUser = (User) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
@@ -166,12 +172,15 @@ public class UserController {
         }
 
         User targetUser = targetUserOpt.get();
-        if (userBlockRepository.existsByBlockerIdAndBlockedId(authenticatedUser.getId(), userId)) {
+        if (userBlockRepository.existsBetween(authenticatedUser.getId(), userId)) {
             return ResponseEntity.badRequest().body("Este usuário já está bloqueado.");
         }
 
-        friendshipRepository.findFriendshipBetween(authenticatedUser, targetUser)
-                .ifPresent(friendshipRepository::delete);
+        friendshipRepository.findAllBetween(authenticatedUser.getId(), targetUser.getId())
+                .forEach(friendshipRepository::delete);
+        deckShareRequestRepository.findBetween(
+                authenticatedUser.getId(), targetUser.getId(), "PENDING"
+        ).forEach(deckShareRequestRepository::delete);
 
         UserBlock userBlock = new UserBlock();
         userBlock.setBlocker(authenticatedUser);
@@ -181,7 +190,7 @@ public class UserController {
         return ResponseEntity.ok("Usuário bloqueado com sucesso!");
     }
 
-    @DeleteMapping({"/blocked/{userId}"})
+    @DeleteMapping("/blocked/{userId}")
     @Operation(
             summary = "Desbloqueia um usuário",
             description = "Remove o bloqueio aplicado a outro usuário."
@@ -284,6 +293,10 @@ public class UserController {
             return ResponseEntity.badRequest().body("Você não pode enviar um pedido de amizade para si mesmo.");
         }
 
+        if (userBlockRepository.existsBetween(authenticatedUser.getId(), friendId)) {
+            return ResponseEntity.badRequest().body("Não é possível enviar pedido de amizade entre usuários bloqueados.");
+        }
+
         // 3. Busca o usuário que vai receber o pedido (Corrigindo o erro 403)
         var targetUserOpt = userRepository.findById(friendId);
         if (targetUserOpt.isEmpty()) {
@@ -332,6 +345,10 @@ public class UserController {
 
         if (friendshipOpt.isEmpty()) {
             return ResponseEntity.badRequest().body("Nenhum pedido de amizade pendente encontrado para este usuário.");
+        }
+
+        if (userBlockRepository.existsBetween(authenticatedUser.getId(), senderId)) {
+            return ResponseEntity.badRequest().body("Não é possível aceitar pedido de amizade entre usuários bloqueados.");
         }
 
         // 3. Atualiza o status para ACCEPTED
