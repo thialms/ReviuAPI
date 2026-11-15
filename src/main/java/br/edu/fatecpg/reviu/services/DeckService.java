@@ -9,6 +9,7 @@ import br.edu.fatecpg.reviu.dto.responses.DeckShareRequestResponseDTO;
 import br.edu.fatecpg.reviu.repositories.DeckRepository;
 import br.edu.fatecpg.reviu.repositories.DeckShareRequestRepository;
 import br.edu.fatecpg.reviu.repositories.UserRepository;
+import br.edu.fatecpg.reviu.repositories.UserBlockRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class DeckService {
     public final DeckRepository deckRepository;
     public final DeckShareRequestRepository deckShareRequestRepository;
     public final UserRepository userRepository;
+    public final UserBlockRepository userBlockRepository;
 
     //CREATE
     public DeckResponseDTO createDeck(Long userId, DeckRequestDTO request) {
@@ -94,6 +96,10 @@ public class DeckService {
             throw new IllegalArgumentException("You cannot share a deck with yourself");
         }
 
+        if (userBlockRepository.existsBetween(ownerId, recipientId)) {
+            throw new IllegalArgumentException("Não é possível compartilhar decks entre usuários bloqueados");
+        }
+
         if (deckShareRequestRepository.existsByDeckIdAndRecipientIdAndStatus(
                 deckId, recipientId, "PENDING")) {
             throw new IllegalArgumentException("A share request is already pending");
@@ -119,6 +125,9 @@ public class DeckService {
     @Transactional
     public void acceptShareRequest(Long recipientId, Long requestId) {
         DeckShareRequest request = getPendingRequest(recipientId, requestId);
+        if (userBlockRepository.existsBetween(request.getSender().getId(), recipientId)) {
+            throw new IllegalArgumentException("Não é possível aceitar compartilhamento entre usuários bloqueados");
+        }
         Deck sourceDeck = request.getDeck();
 
         Deck sharedDeck = new Deck();
