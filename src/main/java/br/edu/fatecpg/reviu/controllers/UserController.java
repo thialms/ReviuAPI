@@ -2,6 +2,7 @@ package br.edu.fatecpg.reviu.controllers;
 
 import br.edu.fatecpg.reviu.domain.user.Friendship;
 import br.edu.fatecpg.reviu.domain.user.User;
+import br.edu.fatecpg.reviu.domain.user.UserBlock;
 import br.edu.fatecpg.reviu.domain.user.UserOnboarding;
 import br.edu.fatecpg.reviu.dto.requests.ChangePasswordDTO;
 import br.edu.fatecpg.reviu.dto.requests.OnboardingRequestDTO;
@@ -11,6 +12,7 @@ import br.edu.fatecpg.reviu.dto.responses.UserResponseDTO;
 import br.edu.fatecpg.reviu.repositories.FriendshipRepository;
 import br.edu.fatecpg.reviu.repositories.UserOnboardingRepository;
 import br.edu.fatecpg.reviu.repositories.UserRepository;
+import br.edu.fatecpg.reviu.repositories.UserBlockRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -46,6 +48,9 @@ public class UserController {
 
     @Autowired
     private UserOnboardingRepository onboardingRepository;
+
+    @Autowired
+    private UserBlockRepository userBlockRepository;
 
     @PutMapping("/change-password")
     @Operation(
@@ -112,6 +117,90 @@ public class UserController {
                 .toList();
 
         return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/blocked")
+    @Operation(
+            summary = "Lista os usuários bloqueados",
+            description = "Retorna os usuários bloqueados pelo usuário autenticado."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuários bloqueados retornados com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuário não autenticado")
+    })
+    public ResponseEntity<List<UserResponseDTO>> getBlockedUsers() {
+        User authenticatedUser = (User) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        List<UserResponseDTO> blockedUsers = userBlockRepository
+                .findByBlockerIdOrderByCreatedAtDesc(authenticatedUser.getId())
+                .stream()
+                .map(UserBlock::getBlocked)
+                .map(UserResponseDTO::new)
+                .toList();
+
+        return ResponseEntity.ok(blockedUsers);
+    }
+
+    @PostMapping({"/blocked/{userId}"})
+    @Operation(
+            summary = "Bloqueia um usuário",
+            description = "Bloqueia outro usuário e remove qualquer relação de amizade ou pedido pendente entre vocês."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuário bloqueado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Usuário inválido ou já bloqueado"),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+    })
+    public ResponseEntity<?> blockUser(@PathVariable Long userId) {
+        User authenticatedUser = (User) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        if (authenticatedUser.getId().equals(userId)) {
+            return ResponseEntity.badRequest().body("Você não pode bloquear a si mesmo.");
+        }
+
+        var targetUserOpt = userRepository.findById(userId);
+        if (targetUserOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Usuário não encontrado.");
+        }
+
+        User targetUser = targetUserOpt.get();
+        if (userBlockRepository.existsByBlockerIdAndBlockedId(authenticatedUser.getId(), userId)) {
+            return ResponseEntity.badRequest().body("Este usuário já está bloqueado.");
+        }
+
+        friendshipRepository.findFriendshipBetween(authenticatedUser, targetUser)
+                .ifPresent(friendshipRepository::delete);
+
+        UserBlock userBlock = new UserBlock();
+        userBlock.setBlocker(authenticatedUser);
+        userBlock.setBlocked(targetUser);
+        userBlockRepository.save(userBlock);
+
+        return ResponseEntity.ok("Usuário bloqueado com sucesso!");
+    }
+
+    @DeleteMapping({"/blocked/{userId}"})
+    @Operation(
+            summary = "Desbloqueia um usuário",
+            description = "Remove o bloqueio aplicado a outro usuário."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuário desbloqueado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Usuário não está bloqueado")
+    })
+    public ResponseEntity<?> unblockUser(@PathVariable Long userId) {
+        User authenticatedUser = (User) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        var blockOpt = userBlockRepository.findByBlockerIdAndBlockedId(authenticatedUser.getId(), userId);
+        if (blockOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Este usuário não está bloqueado.");
+        }
+
+        userBlockRepository.delete(blockOpt.get());
+        return ResponseEntity.ok("Usuário desbloqueado com sucesso!");
     }
 
     @GetMapping("/friends")

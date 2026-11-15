@@ -179,6 +179,9 @@ Acesse o Swagger em:
 - `GET /user/search?username={username}` — Pesquisa usuários por username
 - `GET /user/friends` — Lista os amigos do usuário autenticado
 - `GET /user/friends/requests` — Lista os pedidos de amizades pendentes do usuário autenticado
+- `GET /user/blocked` — Lista os usuários bloqueados pelo usuário autenticado
+- `POST /user/blocked/{userId}` — Bloqueia um usuário
+- `DELETE /user/blocked/{userId}` — Desbloqueia um usuário
 - `DELETE /user/friends/{friendId}/unfriend` — Desfazer amizade
 - `DELETE /user/friends/request/{senderId}/reject` — Recusar pedido de amizade
 - `DELETE /user/friends/request/{receiverId}/cancel` — Cancelar pedido de amizade
