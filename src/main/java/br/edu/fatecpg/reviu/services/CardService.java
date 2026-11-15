@@ -12,8 +12,8 @@ import br.edu.fatecpg.reviu.repositories.DeckRepository;
 import br.edu.fatecpg.reviu.repositories.UserRepository;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -25,18 +25,33 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class CardService {
     private static final String ML_INTERVAL_ENDPOINT =
             "https://reviu-ml-api-ebewfmfhcqe3fkdw.brazilsouth-01.azurewebsites.net/prever_intervalo";
-    private static final RestTemplate ML_REST_TEMPLATE = createMlRestTemplate();
 
+    private final RestTemplate mlRestTemplate;
     private final CardRepository cardRepository;
     private final CardReviewRepository cardReviewRepository;
     private final DeckRepository deckRepository;
     private final UserRepository userRepository;
     private final DictionaryAPIService dictionaryAPIService;
+
+    public CardService(
+            @Value("${api.ml.token}") String mlApiKey,
+            CardRepository cardRepository,
+            CardReviewRepository cardReviewRepository,
+            DeckRepository deckRepository,
+            UserRepository userRepository,
+            DictionaryAPIService dictionaryAPIService
+    ) {
+        this.mlRestTemplate = createMlRestTemplate(mlApiKey);
+        this.cardRepository = cardRepository;
+        this.cardReviewRepository = cardReviewRepository;
+        this.deckRepository = deckRepository;
+        this.userRepository = userRepository;
+        this.dictionaryAPIService = dictionaryAPIService;
+    }
 
     private Card buildCard(CardRequestDTO request) {
         Card card = new Card();
@@ -146,7 +161,7 @@ public class CardService {
                     review.getEasinessFactor(),
                     quality
             );
-            ResponseEntity<MlIntervalResponse> response = ML_REST_TEMPLATE.postForEntity(
+            ResponseEntity<MlIntervalResponse> response = mlRestTemplate.postForEntity(
                     ML_INTERVAL_ENDPOINT, request, MlIntervalResponse.class);
 
             if (response.getStatusCode().value() != 200
@@ -169,18 +184,18 @@ public class CardService {
         }
     }
 
-    private static RestTemplate createMlRestTemplate() {
+    private static RestTemplate createMlRestTemplate(String mlApiKey) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(4));
         requestFactory.setReadTimeout(Duration.ofSeconds(4));
 
         RestTemplate restTemplate = new RestTemplate(requestFactory);
         restTemplate.getInterceptors()
-        .add((request, body, execution) -> {
-            request.getHeaders().set("Accept", "application/json");
-            request.getHeaders().set("X-API-Key", "${ML_API_KEY}");
-            return execution.execute(request, body);
-        });
+                .add((request, body, execution) -> {
+                    request.getHeaders().set("Accept", "application/json");
+                    request.getHeaders().set("X-API-Key", mlApiKey);
+                    return execution.execute(request, body);
+                });
         return restTemplate;
     }
 

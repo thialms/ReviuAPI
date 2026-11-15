@@ -1,0 +1,8 @@
+{
+  "properties": [
+    {
+      "name": "api.ml.token",
+      "type": "java.lang.String",
+      "description": "Description for api.ml.token."
+  }
+] }
