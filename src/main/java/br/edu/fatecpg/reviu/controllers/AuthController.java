@@ -22,6 +22,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
@@ -64,6 +66,15 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "E-mail ou nome de usuário já cadastrado, ou dados inválidos")
     })
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequestDTO body) {
+        String timezone = body.timezone() == null || body.timezone().isBlank()
+                ? "UTC"
+                : body.timezone();
+        try {
+            ZoneId.of(timezone);
+        } catch (DateTimeException exception) {
+            return ResponseEntity.badRequest().body("Fuso horário inválido. Use um identificador IANA válido.");
+        }
+
         Optional<User> user = this.userRepository.findByEmail(body.email());
         if (user.isPresent()) {
             return ResponseEntity.badRequest().body("E-mail já cadastrado.");
@@ -79,6 +90,7 @@ public class AuthController {
         newUser.setEmail(body.email());
         newUser.setName(body.name());
         newUser.setUsername(body.username());
+        newUser.setTimezone(timezone);
 
         this.userRepository.save(newUser);
 

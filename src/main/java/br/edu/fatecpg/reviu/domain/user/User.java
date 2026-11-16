@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,6 +36,15 @@ public class User {
 
     // Vericação do email
     private Boolean verified = false; // true se o usuário confirmou o e-mail
+
+    @Column(name = "current_streak", nullable = false)
+    private int currentStreak = 0;
+
+    @Column(name = "last_review_date")
+    private LocalDate lastReviewDate;
+
+    @Column(nullable = false, length = 100)
+    private String timezone = "UTC";
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Deck> decks = new ArrayList<>();

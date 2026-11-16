@@ -186,6 +186,9 @@ Acesse o Swagger em:
 - `DELETE /user/friends/request/{senderId}/reject` — Recusar pedido de amizade
 - `DELETE /user/friends/request/{receiverId}/cancel` — Cancelar pedido de amizade
 - `PUT /user/onboarding` — Atualizar configuração de onboarding
+- `PUT /user/timezone` — Atualizar o fuso horário IANA usado na ofensiva
+
+A ofensiva é verificada automaticamente a cada 15 minutos. Usuários com cards vencidos no dia anterior que não fizeram nenhuma revisão têm a ofensiva zerada; usuários sem cards pendentes não são afetados.
 
 ### 🗂 Baralhos (`/decks`)
 - `POST /` — Criar baralho  
