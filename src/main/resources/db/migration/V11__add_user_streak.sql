@@ -1,0 +1,4 @@
+ALTER TABLE users
+    ADD COLUMN current_streak INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN last_review_date DATE,
+    ADD COLUMN timezone VARCHAR(100) NOT NULL DEFAULT 'UTC';

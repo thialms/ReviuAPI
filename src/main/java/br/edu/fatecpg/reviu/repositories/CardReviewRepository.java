@@ -12,5 +12,6 @@ public interface CardReviewRepository extends JpaRepository<CardReview, Long> {
     List<CardReview> findByUserIdAndCardIdIn(Long userId, List<Long> cardIds);
     List<CardReview> findByUserIdAndCardIdInAndNextReviewLessThanEqual(
             Long userId, List<Long> cardIds, LocalDate date);
+    List<CardReview> findByUserIdAndNextReviewLessThanEqual(Long userId, LocalDate date);
     void deleteByCardId(Long cardId);
 }

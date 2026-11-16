@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -123,19 +124,28 @@ public class CardService {
         Card card = findCard(cardId);
         CardReview review = cardReviewRepository.findByUserIdAndCardId(userId, cardId)
                 .orElseGet(() -> createReviewIfMissing(userId, card));
+        LocalDate today = today(review.getUser());
+        boolean countsForStreak = review.getNextReview() == null
+                || !review.getNextReview().isAfter(today);
         if (!processReviewWithML(review, quality)) {
             processReview(review, quality);
         }
-        return cardReviewRepository.save(review);
+        CardReview savedReview = cardReviewRepository.save(review);
+        if (countsForStreak) {
+            updateStreak(savedReview.getUser(), today);
+        }
+        return savedReview;
     }
 
     @Transactional
     public List<Card> getDueCards(Long deckId, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
         List<Card> cards = getCardByDeck(deckId);
         List<Long> cardIds = cards.stream().map(Card::getId).toList();
         cards.forEach(card -> createReviewIfMissing(userId, card));
         List<CardReview> dueReviews = cardReviewRepository
-                .findByUserIdAndCardIdInAndNextReviewLessThanEqual(userId, cardIds, LocalDate.now());
+                .findByUserIdAndCardIdInAndNextReviewLessThanEqual(userId, cardIds, today(user));
         return dueReviews.stream().map(CardReview::getCard).toList();
     }
 
@@ -172,7 +182,7 @@ public class CardService {
             }
 
             int interval = response.getBody().proximoIntervaloDias();
-            LocalDate today = LocalDate.now();
+            LocalDate today = today(review.getUser());
             review.setInterval(interval);
             review.setLastReview(today);
             review.setNextReview(today.plusDays(interval));
@@ -236,8 +246,25 @@ public class CardService {
         review.setRepetitions(repetitions);
         review.setInterval(interval);
         review.setEasinessFactor(ef);
-        review.setLastReview(LocalDate.now());
-        review.setNextReview(LocalDate.now().plusDays(interval));
+        LocalDate today = today(review.getUser());
+        review.setLastReview(today);
+        review.setNextReview(today.plusDays(interval));
+    }
+
+    private void updateStreak(User user, LocalDate reviewDate) {
+        LocalDate lastReviewDate = user.getLastReviewDate();
+        if (reviewDate.equals(lastReviewDate)) {
+            return;
+        }
+
+        int streak = lastReviewDate != null
+                && lastReviewDate.plusDays(1).equals(reviewDate)
+                ? user.getCurrentStreak() + 1
+                : 1;
+
+        user.setCurrentStreak(streak);
+        user.setLastReviewDate(reviewDate);
+        userRepository.save(user);
     }
 
     private CardReview createReviewIfMissing(Long userId, Card card) {
@@ -249,7 +276,7 @@ public class CardService {
             review.setCard(card);
             review.setInterval(1);
             review.setEasinessFactor(2.5);
-            review.setNextReview(LocalDate.now());
+            review.setNextReview(today(user));
             return cardReviewRepository.save(review);
         });
     }
@@ -257,6 +284,13 @@ public class CardService {
     private Deck findDeck(Long deckId) {
         return deckRepository.findById(deckId)
                 .orElseThrow(() -> new EntityNotFoundException("Deck not found"));
+    }
+
+    private LocalDate today(User user) {
+        String timezone = user.getTimezone() == null || user.getTimezone().isBlank()
+                ? "UTC"
+                : user.getTimezone();
+        return LocalDate.now(ZoneId.of(timezone));
     }
 
     private Card findCard(Long cardId) {

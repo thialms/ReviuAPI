@@ -25,7 +25,16 @@ public record UserResponseDTO(
         String profileImageUrl,
 
         @Schema(description = "Indica se o e-mail do usuário foi verificado", example = "true")
-        Boolean verified
+        Boolean verified,
+
+        @Schema(description = "Quantidade de dias consecutivos com pelo menos uma revisão", example = "7")
+        int currentStreak,
+
+        @Schema(description = "Data da última revisão que contou para a ofensiva", example = "2026-11-15")
+        java.time.LocalDate lastReviewDate,
+
+        @Schema(description = "Fuso horário IANA usado para calcular o dia da ofensiva", example = "America/Sao_Paulo")
+        String timezone
 
 ) {
     public UserResponseDTO(User user) {
@@ -35,7 +44,10 @@ public record UserResponseDTO(
                 user.getUsername(),
                 user.getEmail(),
                 user.getProfileImageUrl(),
-                user.getVerified()
+                user.getVerified(),
+                user.getCurrentStreak(),
+                user.getLastReviewDate(),
+                user.getTimezone()
         );
     }
 }

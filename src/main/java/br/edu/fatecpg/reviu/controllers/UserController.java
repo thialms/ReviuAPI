@@ -7,6 +7,7 @@ import br.edu.fatecpg.reviu.repositories.DeckShareRequestRepository;
 import br.edu.fatecpg.reviu.domain.user.UserOnboarding;
 import br.edu.fatecpg.reviu.dto.requests.ChangePasswordDTO;
 import br.edu.fatecpg.reviu.dto.requests.OnboardingRequestDTO;
+import br.edu.fatecpg.reviu.dto.requests.TimezoneRequestDTO;
 import br.edu.fatecpg.reviu.dto.responses.FriendResponseDTO;
 import br.edu.fatecpg.reviu.dto.responses.FriendRequestResponseDTO;
 import br.edu.fatecpg.reviu.dto.responses.UserResponseDTO;
@@ -30,6 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.time.ZoneId;
+import java.time.DateTimeException;
 
 @RestController
 @RequestMapping("/user")
@@ -105,6 +108,30 @@ public class UserController {
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
         return ResponseEntity.ok(new UserResponseDTO(user));
+    }
+
+    @PutMapping("/timezone")
+    @Operation(
+            summary = "Atualiza o fuso horário do usuário",
+            description = "Define o fuso horário IANA usado para calcular a data local das revisões e da ofensiva."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Fuso horário atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Fuso horário inválido")
+    })
+    public ResponseEntity<?> updateTimezone(@Valid @RequestBody TimezoneRequestDTO body) {
+        User authenticatedUser = (User) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        try {
+            ZoneId.of(body.timezone());
+        } catch (DateTimeException exception) {
+            return ResponseEntity.badRequest().body("Fuso horário inválido. Use um identificador IANA válido.");
+        }
+
+        authenticatedUser.setTimezone(body.timezone());
+        userRepository.save(authenticatedUser);
+        return ResponseEntity.ok(new UserResponseDTO(authenticatedUser));
     }
 
     @GetMapping("/search")

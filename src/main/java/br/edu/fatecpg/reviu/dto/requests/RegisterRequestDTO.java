@@ -67,5 +67,12 @@ public record RegisterRequestDTO(
                 example = "Leve",
                 defaultValue = "Leve"
         )
-        String ritmoRevisao
+        String ritmoRevisao,
+
+        @Schema(
+                description = "Fuso horário IANA obtido automaticamente pelo aplicativo.",
+                example = "America/Sao_Paulo",
+                defaultValue = "UTC"
+        )
+        String timezone
 ) {}
