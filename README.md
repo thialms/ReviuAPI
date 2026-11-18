@@ -158,6 +158,9 @@ Acesse o Swagger em:
 
 👉 **http://localhost:8080/swagger-ui/index.html**
 
+As páginas do Swagger são protegidas por usuário e senha configurados nas variáveis
+`SWAGGER_USERNAME` e `SWAGGER_PASSWORD`. Defina os dois valores no `.env` antes de iniciar a aplicação.
+
 ---
 
 # 📡 Visão Geral dos Endpoints

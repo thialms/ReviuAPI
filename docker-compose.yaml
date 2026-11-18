@@ -22,6 +22,8 @@ services:
       azure.storage.container-name: reviu-app-images
 
       gemini.api.key: ${GEMINI_API_KEY}
+      swagger.username: ${SWAGGER_USERNAME}
+      swagger.password: ${SWAGGER_PASSWORD}
 
     depends_on:
       - reviu-db
