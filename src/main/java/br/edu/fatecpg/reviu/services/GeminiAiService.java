@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -14,6 +15,9 @@ import java.util.Map;
 
 @Service
 public class GeminiAiService {
+
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long INITIAL_BACKOFF_MILLIS = 1_000;
 
     private final String apiKey;
     private final ObjectMapper objectMapper;
@@ -79,7 +83,7 @@ public class GeminiAiService {
                     .POST(HttpRequest.BodyPublishers.ofString(jsonRequest))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = sendWithExponentialBackoff(request);
 
             if (response.statusCode() != 200) {
                 System.err.println("ERRO GOOGLE: " + response.body());
@@ -89,8 +93,40 @@ public class GeminiAiService {
             return extractContent(response.body());
 
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new RuntimeException("Falha ao gerar cards: " + e.getMessage());
         }
+    }
+
+    private HttpResponse<String> sendWithExponentialBackoff(HttpRequest request)
+            throws IOException, InterruptedException {
+        long backoffMillis = INITIAL_BACKOFF_MILLIS;
+
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(
+                        request, HttpResponse.BodyHandlers.ofString());
+
+                if (!isRetryableStatus(response.statusCode()) || attempt == MAX_ATTEMPTS) {
+                    return response;
+                }
+            } catch (IOException e) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw e;
+                }
+            }
+
+            Thread.sleep(backoffMillis);
+            backoffMillis *= 2;
+        }
+
+        throw new IOException("Não foi possível concluir a requisição ao Gemini.");
+    }
+
+    private boolean isRetryableStatus(int statusCode) {
+        return statusCode == 429 || statusCode >= 500;
     }
 
     private String extractContent(String rawResponse) throws Exception {
